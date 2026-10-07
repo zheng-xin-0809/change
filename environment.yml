@@ -1,0 +1,8 @@
+name: fitness_app_dev
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.12
+  - openjdk=17
+# Flutter/Android SDK: tools/setup_env.py; Dart dependencies: pubspec.yaml + pubspec.lock.
