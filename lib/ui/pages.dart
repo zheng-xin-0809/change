@@ -6,6 +6,7 @@ import '../l10n/app_localizations.dart';
 import 'app_controller.dart';
 import 'labels.dart';
 import 'weight_dialog.dart';
+import 'accent_color_editor.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key, required this.controller});
@@ -67,7 +68,7 @@ class _AppShellState extends State<AppShell> {
         bottomNavigationBar: NavigationBar(
           selectedIndex: _index,
           onDestinationSelected: _go,
-          labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
           height: 84,
           destinations: List.generate(
             labels.length,
@@ -482,6 +483,20 @@ class SettingsPage extends StatelessWidget {
           icon: Icons.calculate_outlined,
           title: l.calculationTitle,
           body: l.calculationPending,
+        ),
+        InfoCard(
+          icon: Icons.palette_outlined,
+          title: l.accentTitle,
+          body: l.accentBody,
+        ),
+        FilledButton.icon(
+          key: const ValueKey('edit_accent'),
+          onPressed: () => showDialog<void>(
+            context: context,
+            builder: (_) => AccentColorEditor(controller: controller),
+          ),
+          icon: const Icon(Icons.tune),
+          label: Text(l.accentAction),
         ),
       ],
     );

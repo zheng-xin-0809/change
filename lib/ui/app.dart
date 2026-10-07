@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
 import 'app_controller.dart';
+import 'app_theme.dart';
 import 'pages.dart';
 
 /// Chinese Android locales (including region variants) use zh. All other
@@ -29,40 +30,10 @@ class FitNotesApp extends StatelessWidget {
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       localeListResolutionCallback: resolveSupportedLocale,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF166A58),
-          surface: const Color(0xFFF5F6F3),
-        ),
-        scaffoldBackgroundColor: const Color(0xFFF5F6F3),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFFF5F6F3),
-          scrolledUnderElevation: 0,
-          centerTitle: false,
-        ),
-        cardTheme: CardThemeData(
-          color: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-        ),
-        inputDecorationTheme: const InputDecorationTheme(
-          border: OutlineInputBorder(),
-        ),
-        filledButtonTheme: FilledButtonThemeData(
-          style: FilledButton.styleFrom(
-            minimumSize: const Size(48, 48),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          ),
-        ),
-        outlinedButtonTheme: OutlinedButtonThemeData(
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size(48, 48),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          ),
-        ),
-      ),
+      theme: buildAppTheme(controller.accentColor),
+      themeAnimationDuration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 200),
       home: controller.ready
           ? AppShell(controller: controller)
           : _Startup(controller: controller),

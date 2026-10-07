@@ -82,5 +82,15 @@
   "protein": "蛋白质",
   "fat": "脂肪",
   "foodName": "食物名称",
-  "note": "备注"
+  "note": "备注",
+  "accentTitle": "强调色",
+  "accentBody": "设置按钮、选中状态和重点内容使用的颜色。",
+  "accentAction": "修改强调色",
+  "accentPreview": "预览",
+  "accentHex": "十六进制颜色",
+  "accentRed": "红色",
+  "accentGreen": "绿色",
+  "accentBlue": "蓝色",
+  "accentHexInvalid": "请输入六位十六进制颜色，例如 #166A58。",
+  "accentSaveFailed": "强调色保存失败，请重试。"
 }

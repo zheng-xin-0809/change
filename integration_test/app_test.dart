@@ -7,8 +7,10 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fit_notes/data/language_store.dart';
+import 'package:fit_notes/data/accent_store.dart';
 import 'package:fit_notes/data/local_record_store.dart';
 import 'package:fit_notes/domain/models.dart';
+import 'package:fit_notes/domain/accent_color.dart';
 import 'package:fit_notes/ui/app.dart';
 import 'package:fit_notes/ui/app_controller.dart';
 
@@ -22,6 +24,7 @@ void main() {
         p.join(documents.path, 'integration_test_data'),
       ).create(recursive: true);
       const preferenceKey = 'integration_test.locale_mode';
+      const accentPreferenceKey = 'integration_test.accent_hex';
       final preferences = SharedPreferencesAsync();
       LocalRecordStore newStore() => LocalRecordStore(
         databasePath: p.join(isolated.path, 'test.db'),
@@ -30,13 +33,16 @@ void main() {
       var store = newStore();
       var controller = AppController(
         languageStore: LocalLanguageStore(key: preferenceKey),
+        accentStore: LocalAccentStore(key: accentPreferenceKey),
         records: store,
       );
       try {
         await preferences.remove(preferenceKey);
+        await preferences.remove(accentPreferenceKey);
         await controller.initialize();
         await tester.pumpWidget(FitNotesApp(controller: controller));
         await tester.pumpAndSettle();
+        await controller.setAccent(AccentColor.parse('#D04020')!);
         await controller.setLanguage(LanguageMode.en);
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(const ValueKey('nav_2')));
@@ -56,10 +62,12 @@ void main() {
         store = newStore();
         controller = AppController(
           languageStore: LocalLanguageStore(key: preferenceKey),
+          accentStore: LocalAccentStore(key: accentPreferenceKey),
           records: store,
         );
         await controller.initialize();
         expect(controller.locale, const Locale('en'));
+        expect(controller.accentColor.hex, '#D04020');
         expect(
           (await store.weightFor(localDateKey(DateTime.now())))!.kilograms,
           65.5,
@@ -74,6 +82,7 @@ void main() {
         controller.dispose();
         await store.close();
         await preferences.remove(preferenceKey);
+        await preferences.remove(accentPreferenceKey);
         await isolated.delete(recursive: true);
       }
     },

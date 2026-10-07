@@ -83,6 +83,16 @@
   "fat": "Fat",
   "foodName": "Food name",
   "note": "Note",
+  "accentTitle": "Accent color",
+  "accentBody": "Choose a color for buttons, selections and highlights.",
+  "accentAction": "Edit accent color",
+  "accentPreview": "Preview",
+  "accentHex": "Hex color",
+  "accentRed": "Red",
+  "accentGreen": "Green",
+  "accentBlue": "Blue",
+  "accentHexInvalid": "Enter a six-digit hex color, such as #166A58.",
+  "accentSaveFailed": "Could not save the accent color. Please try again.",
   "@weightValue": {
     "placeholders": {
       "value": {

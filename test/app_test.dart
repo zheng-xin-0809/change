@@ -6,9 +6,11 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fit_notes/domain/models.dart';
+import 'package:fit_notes/domain/accent_color.dart';
 import 'package:fit_notes/services/calculation_service.dart';
 import 'package:fit_notes/ui/app.dart';
 import 'package:fit_notes/ui/app_controller.dart';
+import 'package:fit_notes/ui/app_theme.dart';
 
 import 'test_support.dart';
 
@@ -33,6 +35,7 @@ void main() {
   Future<AppController> start(
     WidgetTester tester, {
     MemoryLanguageStore? languages,
+    MemoryAccentStore? accents,
     MemoryRecordStore? records,
     Locale system = const Locale('zh', 'CN'),
     double scale = 1,
@@ -51,6 +54,7 @@ void main() {
     });
     final controller = AppController(
       languageStore: languages ?? MemoryLanguageStore(),
+      accentStore: accents ?? MemoryAccentStore(),
       records: records ?? MemoryRecordStore(),
     );
     await controller.initialize();
@@ -121,6 +125,7 @@ void main() {
       expect(languages.mode, LanguageMode.en);
       final restarted = AppController(
         languageStore: languages,
+        accentStore: MemoryAccentStore(),
         records: MemoryRecordStore(),
       );
       await restarted.initialize();
@@ -160,6 +165,50 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('nav_0')));
     await tester.pumpAndSettle();
     expect(find.text('65.5 千克'), findsOneWidget);
+  });
+
+  testWidgets('accent hex edits preview, save and persist locally', (
+    tester,
+  ) async {
+    final accents = MemoryAccentStore();
+    final controller = await start(tester, accents: accents);
+    await tester.tap(find.byKey(const ValueKey('nav_4')));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('edit_accent')),
+      500,
+      scrollable: find.byType(Scrollable),
+    );
+    expect(find.text('强调色'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('edit_accent')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('accent_hex')), '#FF0000');
+    await tester.pumpAndSettle();
+    expect(find.text('红色: 255'), findsOneWidget);
+    expect(find.text('绿色: 0'), findsOneWidget);
+    expect(find.text('蓝色: 0'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('save_accent')));
+    await tester.pumpAndSettle();
+    expect(controller.accentColor.hex, '#FF0000');
+    expect(accents.color.hex, '#FF0000');
+
+    final restarted = AppController(
+      languageStore: MemoryLanguageStore(),
+      accentStore: accents,
+      records: MemoryRecordStore(),
+    );
+    await restarted.initialize();
+    expect(restarted.accentColor.hex, '#FF0000');
+    restarted.dispose();
+
+    await tester.tap(find.byKey(const ValueKey('edit_accent')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('accent_hex')), 'red');
+    await tester.pumpAndSettle();
+    expect(find.text('请输入六位十六进制颜色，例如 #166A58。'), findsOneWidget);
+    expect(find.byType(AlertDialog), findsOneWidget);
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('save failures retain the input and prior language', (
@@ -235,5 +284,13 @@ void main() {
       service.calculate(UnspecifiedInput(), TrainingTime.beforeLunch),
       throwsA(isA<CalculationNotConfigured>()),
     );
+  });
+
+  test('accent contrast helper chooses readable foregrounds', () {
+    expect(textOnAccent(const Color(0xFFFFFFFF)), Colors.black);
+    expect(textOnAccent(const Color(0xFF000000)), Colors.white);
+    expect(contrastRatio(Colors.black, Colors.white), greaterThanOrEqualTo(21));
+    expect(AccentColor.parse('#12aBcD')!.hex, '#12ABCD');
+    expect(AccentColor.parse('#12ABC'), isNull);
   });
 }

@@ -1,6 +1,8 @@
 import 'package:flutter/widgets.dart';
 
 import '../data/language_store.dart';
+import '../data/accent_store.dart';
+import '../domain/accent_color.dart';
 import '../data/local_record_store.dart';
 import '../domain/models.dart';
 import '../services/calculation_service.dart';
@@ -9,10 +11,14 @@ class AppController extends ChangeNotifier {
   AppController({
     required this.languageStore,
     required this.records,
+    required this.accentStore,
     this.calculation = const PendingCalculationService(),
   });
   final LanguageStore languageStore;
   final RecordStore records;
+  final AccentStore accentStore;
+  AccentColor accentColor = AccentColor.defaultColor;
+  bool savingAccent = false;
   final CalculationService calculation;
   LanguageMode languageMode = LanguageMode.system;
   WeightEntry? latest;
@@ -34,6 +40,7 @@ class AppController extends ChangeNotifier {
     notifyListeners();
     try {
       languageMode = await languageStore.read();
+      accentColor = await accentStore.read();
       await records.initialize();
       latest = await records.latestWeight();
       ready = true;
@@ -65,5 +72,18 @@ class AppController extends ChangeNotifier {
       latest = entry;
     }
     notifyListeners();
+  }
+
+  Future<void> setAccent(AccentColor color) async {
+    if (savingAccent || color == accentColor) return;
+    savingAccent = true;
+    notifyListeners();
+    try {
+      await accentStore.write(color);
+      accentColor = color;
+    } finally {
+      savingAccent = false;
+      notifyListeners();
+    }
   }
 }
