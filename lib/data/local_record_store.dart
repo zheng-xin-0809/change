@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -12,6 +13,11 @@ abstract interface class RecordStore {
   Future<WeightEntry?> latestWeight();
   Future<WeightEntry?> weightFor(String date);
   Future<void> saveWeight(WeightEntry entry);
+  Future<List<TrainingPlan>> plans();
+  Future<List<TrainingPlan>> createPlan(String name);
+  Future<List<TrainingPlan>> renamePlan(String id, String name);
+  Future<List<TrainingPlan>> activatePlan(String id);
+  Future<List<TrainingPlan>> deletePlan(String id);
   Future<void> close();
 }
 
@@ -160,6 +166,97 @@ class LocalRecordStore implements RecordStore {
 
   /// Scheduled collections will use JSON arrays of stable IDs, never labels.
   static String encodeIds(Iterable<String> ids) => jsonEncode(ids.toList());
+
+  Future<List<TrainingPlan>> _plans(DatabaseExecutor db) async {
+    final rows = await db.query('training_plans', orderBy: 'rowid ASC');
+    return rows
+        .map(
+          (row) => TrainingPlan(
+            id: row['id'] as String,
+            name: row['name'] as String,
+            active: row['active'] == 1,
+          ),
+        )
+        .toList();
+  }
+
+  @override
+  Future<List<TrainingPlan>> plans() => _plans(_database);
+
+  Future<void> _requirePlan(DatabaseExecutor db, String id) async {
+    if ((await db.query(
+      'training_plans',
+      where: 'id = ?',
+      whereArgs: [id],
+    )).isEmpty) {
+      throw StateError('Plan no longer exists');
+    }
+  }
+
+  @override
+  Future<List<TrainingPlan>> createPlan(String name) async {
+    final normalized = validatedPlanName(name);
+    final random = Random.secure();
+    final id = List.generate(
+      16,
+      (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
+    ).join();
+    return _database.transaction((txn) async {
+      final existing = await _plans(txn);
+      await txn.insert('training_plans', {
+        'id': id,
+        'name': normalized,
+        'active': existing.any((plan) => plan.active) ? 0 : 1,
+      });
+      return _plans(txn);
+    });
+  }
+
+  @override
+  Future<List<TrainingPlan>> renamePlan(String id, String name) async {
+    final normalized = validatedPlanName(name);
+    return _database.transaction((txn) async {
+      await _requirePlan(txn, id);
+      await txn.update(
+        'training_plans',
+        {'name': normalized},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      return _plans(txn);
+    });
+  }
+
+  @override
+  Future<List<TrainingPlan>> activatePlan(String id) =>
+      _database.transaction((txn) async {
+        await _requirePlan(txn, id);
+        await txn.update('training_plans', {'active': 0}, where: 'active = 1');
+        await txn.update(
+          'training_plans',
+          {'active': 1},
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+        return _plans(txn);
+      });
+
+  @override
+  Future<List<TrainingPlan>> deletePlan(String id) =>
+      _database.transaction((txn) async {
+        await _requirePlan(txn, id);
+        await txn.delete('training_plans', where: 'id = ?', whereArgs: [id]);
+        final remaining = await _plans(txn);
+        if (remaining.isNotEmpty && !remaining.any((plan) => plan.active)) {
+          await txn.update(
+            'training_plans',
+            {'active': 1},
+            where: 'id = ?',
+            whereArgs: [remaining.first.id],
+          );
+        }
+        return _plans(txn);
+      });
 
   @override
   Future<void> close() async {

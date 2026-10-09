@@ -167,6 +167,135 @@ void main() {
     expect(find.text('65.5 千克'), findsOneWidget);
   });
 
+  Future<void> createPlan(WidgetTester tester, String name) async {
+    await tester.tap(find.byKey(const ValueKey('create_plan')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('plan_name')), name);
+    await tester.tap(find.byKey(const ValueKey('submit_plan')));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets(
+    'plans create, rename, switch, cancel deletion and delete to empty',
+    (tester) async {
+      final records = MemoryRecordStore();
+      final key = GlobalKey();
+      final controller = await start(tester, records: records, imageKey: key);
+      await tester.tap(find.byKey(const ValueKey('nav_1')));
+      await tester.pumpAndSettle();
+      await createPlan(tester, '  力量训练  ');
+      final firstId = controller.activePlan!.id;
+      expect(find.text('力量训练'), findsOneWidget);
+      await createPlan(tester, '周末 Plan');
+      final secondId = controller.plans.last.id;
+      expect(controller.activePlan!.id, firstId);
+      await tester.tap(find.byKey(ValueKey('rename_$secondId')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const ValueKey('plan_name')), '周末全身');
+      await tester.tap(find.byKey(const ValueKey('submit_plan')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(ValueKey('activate_$secondId')));
+      await tester.pumpAndSettle();
+      expect(controller.activePlan!.name, '周末全身');
+      await snapshot(tester, key, 'plans_zh');
+      final restarted = AppController(
+        languageStore: MemoryLanguageStore(),
+        accentStore: MemoryAccentStore(),
+        records: records,
+      );
+      await restarted.initialize();
+      expect(restarted.activePlan!.id, secondId);
+      restarted.dispose();
+      await controller.setLanguage(LanguageMode.en);
+      await tester.pumpAndSettle();
+      expect(find.text('周末全身'), findsOneWidget);
+      expect(find.text('Current plan'), findsOneWidget);
+      await tester.tap(find.byKey(ValueKey('delete_$secondId')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('cancel_plan')));
+      await tester.pumpAndSettle();
+      expect(controller.plans, hasLength(2));
+      await tester.tap(find.byKey(ValueKey('delete_$secondId')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('submit_plan')));
+      await tester.pumpAndSettle();
+      expect(controller.activePlan!.id, firstId);
+      await tester.tap(find.byKey(ValueKey('delete_$firstId')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('submit_plan')));
+      await tester.pumpAndSettle();
+      expect(find.text('No training plans yet'), findsOneWidget);
+      expect(controller.activePlan, isNull);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'invalid plan names, storage failures and retry preserve user input',
+    (tester) async {
+      final records = MemoryRecordStore();
+      final controller = await start(tester, records: records);
+      await tester.tap(find.byKey(const ValueKey('nav_1')));
+      await tester.pumpAndSettle();
+      await createPlan(tester, '   ');
+      expect(find.text('请输入 1 至 60 个字符的名称。'), findsOneWidget);
+      expect(controller.plans, isEmpty);
+      records.failPlans = true;
+      await tester.enterText(find.byKey(const ValueKey('plan_name')), '保留输入');
+      await tester.tap(find.byKey(const ValueKey('submit_plan')));
+      await tester.pumpAndSettle();
+      expect(find.text('计划修改失败，请重试。原有计划保留。'), findsOneWidget);
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const ValueKey('plan_name')))
+            .controller!
+            .text,
+        '保留输入',
+      );
+      expect(controller.savingPlan, isFalse);
+      records.failPlans = false;
+      await tester.tap(find.byKey(const ValueKey('submit_plan')));
+      await tester.pumpAndSettle();
+      final id = controller.activePlan!.id;
+      records.failPlans = true;
+      await tester.tap(find.byKey(ValueKey('delete_$id')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('submit_plan')));
+      await tester.pumpAndSettle();
+      expect(controller.activePlan!.id, id);
+      expect(find.byType(AlertDialog), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('cancel_plan')));
+      await tester.pumpAndSettle();
+      await expectLater(controller.renamePlan(id, '失败名称'), throwsStateError);
+      expect(controller.activePlan!.name, '保留输入');
+    },
+  );
+
+  testWidgets(
+    'English plan dialogs and long names fit narrow large-text screens',
+    (tester) async {
+      final key = GlobalKey();
+      final controller = await start(
+        tester,
+        system: const Locale('en'),
+        scale: 1.5,
+        size: const Size(360, 800),
+        imageKey: key,
+      );
+      await tester.tap(find.byKey(const ValueKey('nav_1')));
+      await tester.pumpAndSettle();
+      await createPlan(tester, List.filled(60, 'W').join());
+      expect(controller.plans, hasLength(1));
+      await snapshot(tester, key, 'plans_en_large');
+      await tester.tap(
+        find.byKey(ValueKey('rename_${controller.plans.single.id}')),
+      );
+      await tester.pumpAndSettle();
+      await snapshot(tester, key, 'plan_dialog_en_large');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('accent hex edits preview, save and persist locally', (
     tester,
   ) async {

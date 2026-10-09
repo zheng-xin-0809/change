@@ -26,6 +26,11 @@ class AppController extends ChangeNotifier {
   bool loading = false;
   bool startupFailed = false;
   bool savingLanguage = false;
+  List<TrainingPlan> _plans = const [];
+  List<TrainingPlan> get plans => List.unmodifiable(_plans);
+  TrainingPlan? get activePlan =>
+      _plans.where((plan) => plan.active).firstOrNull;
+  bool savingPlan = false;
 
   Locale? get locale => switch (languageMode) {
     LanguageMode.system => null,
@@ -43,6 +48,7 @@ class AppController extends ChangeNotifier {
       accentColor = await accentStore.read();
       await records.initialize();
       latest = await records.latestWeight();
+      _plans = await records.plans();
       ready = true;
     } catch (_) {
       startupFailed = true;
@@ -86,4 +92,27 @@ class AppController extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<void> _changePlans(
+    Future<List<TrainingPlan>> Function() operation,
+  ) async {
+    if (savingPlan) throw StateError('Plan operation already in progress');
+    savingPlan = true;
+    notifyListeners();
+    try {
+      _plans = await operation();
+    } finally {
+      savingPlan = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> createPlan(String name) =>
+      _changePlans(() => records.createPlan(name));
+  Future<void> renamePlan(String id, String name) =>
+      _changePlans(() => records.renamePlan(id, name));
+  Future<void> activatePlan(String id) =>
+      _changePlans(() => records.activatePlan(id));
+  Future<void> deletePlan(String id) =>
+      _changePlans(() => records.deletePlan(id));
 }

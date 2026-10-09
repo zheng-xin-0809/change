@@ -44,6 +44,10 @@ void main() {
         await tester.pumpAndSettle();
         await controller.setAccent(AccentColor.parse('#D04020')!);
         await controller.setLanguage(LanguageMode.en);
+        await controller.createPlan('力量 Plan');
+        await controller.createPlan('Weekend');
+        await controller.activatePlan(controller.plans.last.id);
+        await controller.renamePlan(controller.plans.last.id, 'Weekend 自填');
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(const ValueKey('nav_2')));
         await tester.pumpAndSettle();
@@ -68,6 +72,8 @@ void main() {
         await controller.initialize();
         expect(controller.locale, const Locale('en'));
         expect(controller.accentColor.hex, '#D04020');
+        expect(controller.plans, hasLength(2));
+        expect(controller.activePlan!.name, 'Weekend 自填');
         expect(
           (await store.weightFor(localDateKey(DateTime.now())))!.kilograms,
           65.5,

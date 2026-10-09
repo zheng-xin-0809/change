@@ -32,6 +32,9 @@ class MemoryAccentStore implements AccentStore {
 
 class MemoryRecordStore implements RecordStore {
   final Map<String, WeightEntry> weights = {};
+  List<TrainingPlan> savedPlans = [];
+  int _nextPlanId = 0;
+  bool failPlans = false;
   bool failSave = false;
   bool failInitialize = false;
   @override
@@ -51,6 +54,67 @@ class MemoryRecordStore implements RecordStore {
   Future<void> saveWeight(WeightEntry entry) async {
     if (failSave) throw StateError('Storage write failed');
     weights[entry.date] = entry;
+  }
+
+  @override
+  Future<List<TrainingPlan>> plans() async => List.of(savedPlans);
+
+  void _checkPlanWrite() {
+    if (failPlans) throw StateError('Plan storage unavailable');
+  }
+
+  @override
+  Future<List<TrainingPlan>> createPlan(String name) async {
+    _checkPlanWrite();
+    savedPlans.add(
+      TrainingPlan(
+        id: 'plan_${_nextPlanId++}',
+        name: validatedPlanName(name),
+        active: !savedPlans.any((plan) => plan.active),
+      ),
+    );
+    return plans();
+  }
+
+  @override
+  Future<List<TrainingPlan>> renamePlan(String id, String name) async {
+    _checkPlanWrite();
+    final normalized = validatedPlanName(name);
+    savedPlans = savedPlans
+        .map(
+          (plan) => plan.id == id
+              ? TrainingPlan(id: id, name: normalized, active: plan.active)
+              : plan,
+        )
+        .toList();
+    return plans();
+  }
+
+  @override
+  Future<List<TrainingPlan>> activatePlan(String id) async {
+    _checkPlanWrite();
+    savedPlans = savedPlans
+        .map(
+          (plan) =>
+              TrainingPlan(id: plan.id, name: plan.name, active: plan.id == id),
+        )
+        .toList();
+    return plans();
+  }
+
+  @override
+  Future<List<TrainingPlan>> deletePlan(String id) async {
+    _checkPlanWrite();
+    savedPlans.removeWhere((plan) => plan.id == id);
+    if (savedPlans.isNotEmpty && !savedPlans.any((plan) => plan.active)) {
+      final first = savedPlans.first;
+      savedPlans[0] = TrainingPlan(
+        id: first.id,
+        name: first.name,
+        active: true,
+      );
+    }
+    return plans();
   }
 
   @override

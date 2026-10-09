@@ -1,6 +1,6 @@
 # 第一阶段验收记录
 
-日期：2026-10-07。平台：Windows 11；独立 Conda 环境 fitness_app_dev。
+日期：2026-10-09。平台：Windows 11；独立 Conda 环境 fitness_app_dev。
 
 ## 已完成的检查
 
@@ -15,6 +15,15 @@
 - tools/dev.py、tools/setup_env.py 的 Python 语法检查通过。已检查 Widget 固定文字来自 ARB；Android 桌面名称使用 Android 中文/英文资源。
 - 已安装并应用 `apple-design` skill 的可读层级、克制圆角、间距和对比度原则；强调色编辑覆盖十六进制、RGB、非法输入和本地恢复。
 
+## 训练计划管理小步
+
+- 训练计划支持创建、重命名、切换当前计划、取消删除和确认删除。
+- 首个计划自动成为当前计划；删除当前计划后最早创建的剩余计划自动接替；删除全部计划后可重新创建。
+- 名称会去除首尾空格并限制为 1–60 个 Unicode 字符；计划名称是用户输入，不随语言切换翻译。
+- 所有写操作使用 SQLite 事务；失败时不会留下半完成的当前计划切换或删除结果。
+- `flutter analyze`：No issues found。
+- `flutter test`：17 项全部通过；包含计划 CRUD、重启恢复、级联删除、事务回滚、名称校验、保存失败恢复、中文/英文和 150% 大字号截图。
+
 ## 最终 APK
 
 - UI/强调色版本 `flutter build apk --debug` 成功（44.5 秒）。
@@ -22,6 +31,12 @@
 - aapt2 核对：com.local.fitnotes.fit_notes；版本 0.1.0（1）；minSdk 24（Android 7.0），targetSdk / compileSdk 36；支持 arm64-v8a、armeabi-v7a、x86_64。
 - aapt2 核对桌面名称：英文 Fit Notes；zh / zh-CN / zh-HK / zh-TW / zh-Hant 均为健食日记。
 - SHA256：A918F796873A3332776A531E0156C8D1C59654A11EDE5820B7D5E749CFCFE581。
+
+## 训练计划版本 APK
+
+- `flutter build apk --debug`：成功（96.4 秒）。
+- 文件：`build/app/outputs/flutter-apk/app-debug.apk`；183,678,743 字节，约 175.2 MiB。
+- SHA256：`FE449572FA0833584F835EAB975A721DCB8E4E1BD6AA2F859257CFA255CF32FE`。
 
 ## 尚需手机验收
 
@@ -33,4 +48,4 @@
 python tools/dev.py integration -d 设备ID
 ```
 
-完整餐食记录、计划编辑、实际打卡、背景和拍照不属于本阶段；当前界面明确说明后续实现。没有导入动作数据或媒体，没有加入减脂公式。
+每周训练安排、单日覆盖、实际打卡、餐食记录、背景和拍照不属于本阶段；当前界面明确说明后续实现。没有导入动作数据或媒体，没有加入减脂公式。

@@ -7,6 +7,7 @@ import 'app_controller.dart';
 import 'labels.dart';
 import 'weight_dialog.dart';
 import 'accent_color_editor.dart';
+import 'plan_dialog.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key, required this.controller});
@@ -44,7 +45,7 @@ class _AppShellState extends State<AppShell> {
     ];
     final content = switch (_index) {
       0 => HomePage(controller: widget.controller, onNavigate: _go),
-      1 => const PlansPage(),
+      1 => PlansPage(controller: widget.controller),
       2 => DietPage(controller: widget.controller),
       3 => const CalendarPage(),
       _ => SettingsPage(controller: widget.controller),
@@ -230,23 +231,138 @@ class HomePage extends StatelessWidget {
           title: l.foundationTitle,
           body: l.foundationBody,
         ),
+        if (controller.activePlan case final plan?)
+          SectionCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l.currentPlan,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  plan.name,
+                  key: const ValueKey('home_active_plan'),
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }
 }
 
 class PlansPage extends StatelessWidget {
-  const PlansPage({super.key});
+  const PlansPage({super.key, required this.controller});
+  final AppController controller;
+
+  void _edit(
+    BuildContext context, {
+    TrainingPlan? plan,
+    bool deleting = false,
+  }) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) =>
+          PlanDialog(controller: controller, plan: plan, deleting: deleting),
+    );
+  }
+
+  Future<void> _activate(BuildContext context, TrainingPlan plan) async {
+    try {
+      await controller.activatePlan(plan.id);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppLocalizations.of(context).planActivated(plan.name)),
+        ),
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context).planChangeFailed)),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     return PageList(
       children: [
-        InfoCard(
-          icon: Icons.fitness_center,
-          title: l.noPlansTitle,
-          body: l.noPlansBody,
+        FilledButton.icon(
+          key: const ValueKey('create_plan'),
+          onPressed: controller.savingPlan ? null : () => _edit(context),
+          icon: const Icon(Icons.add),
+          label: Text(l.createPlan),
         ),
+        Text(l.plansHelp),
+        if (controller.savingPlan)
+          Semantics(
+            label: l.planSaving,
+            child: const LinearProgressIndicator(),
+          ),
+        if (controller.plans.isEmpty)
+          InfoCard(
+            icon: Icons.fitness_center,
+            title: l.noPlansTitle,
+            body: l.noPlansBody,
+          ),
+        for (final plan in controller.plans)
+          SectionCard(
+            key: ValueKey('plan_${plan.id}'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(plan.name, style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 8),
+                if (plan.active)
+                  Wrap(
+                    spacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      const Icon(Icons.check_circle_outline, size: 20),
+                      Text(l.currentPlan),
+                    ],
+                  ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (!plan.active)
+                      OutlinedButton(
+                        key: ValueKey('activate_${plan.id}'),
+                        onPressed: controller.savingPlan
+                            ? null
+                            : () => _activate(context, plan),
+                        child: Text(l.usePlan),
+                      ),
+                    IconButton(
+                      key: ValueKey('rename_${plan.id}'),
+                      onPressed: controller.savingPlan
+                          ? null
+                          : () => _edit(context, plan: plan),
+                      tooltip: l.renamePlan,
+                      icon: const Icon(Icons.edit_outlined),
+                    ),
+                    IconButton(
+                      key: ValueKey('delete_${plan.id}'),
+                      color: Theme.of(context).colorScheme.error,
+                      onPressed: controller.savingPlan
+                          ? null
+                          : () => _edit(context, plan: plan, deleting: true),
+                      tooltip: l.deletePlan,
+                      icon: const Icon(Icons.delete_outline),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         SectionCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -255,6 +371,8 @@ class PlansPage extends StatelessWidget {
                 l.trainingSlots,
                 style: Theme.of(context).textTheme.titleLarge,
               ),
+              const SizedBox(height: 12),
+              Text(l.planScheduleLater),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 8,

@@ -131,4 +131,80 @@ void main() {
       expect(await db.query('plan_days'), isEmpty);
     },
   );
+
+  test(
+    'plan CRUD persists, switches atomically and deletes only its schedule',
+    () async {
+      var plans = await store.createPlan('  我的 Plan  ');
+      final first = plans.single;
+      expect(first.name, '我的 Plan');
+      expect(first.active, isTrue);
+      plans = await store.createPlan('第二个');
+      final second = plans.last;
+      expect(plans.first.active, isTrue);
+      expect(second.active, isFalse);
+      expect(second.id, isNot(first.id));
+      await store.activatePlan(second.id);
+      await store.renamePlan(second.id, '  Renamed 自填  ');
+      await store.close();
+      store = createStore();
+      await store.initialize();
+      plans = await store.plans();
+      expect(plans.map((p) => p.id), [first.id, second.id]);
+      expect(plans.where((p) => p.active).single.id, second.id);
+      expect(plans.last.name, 'Renamed 自填');
+      final db = await databaseFactoryFfi.openDatabase(path);
+      await db.insert('plan_days', {
+        'plan_id': second.id,
+        'weekday': 1,
+        'kind': 'rest',
+      });
+      await db.insert('check_ins', {
+        'local_date': '2026-10-09',
+        'kind': 'rest',
+        'completed_at': '2026-10-09T12:00:00',
+      });
+      await store.saveWeight(
+        const WeightEntry(date: '2026-10-09', kilograms: 65),
+      );
+      plans = await store.deletePlan(second.id);
+      expect(plans.single.id, first.id);
+      expect(plans.single.active, isTrue);
+      expect(await db.query('plan_days'), isEmpty);
+      expect(await db.query('check_ins'), hasLength(1));
+      expect((await store.latestWeight())!.kilograms, 65);
+      expect(await store.deletePlan(first.id), isEmpty);
+      expect((await store.createPlan('新计划')).single.active, isTrue);
+    },
+  );
+
+  test(
+    'invalid plan names and missing IDs do not alter active selection',
+    () async {
+      final first = (await store.createPlan('保留')).single;
+      for (final name in ['', '   ', List.filled(61, '中').join()]) {
+        await expectLater(store.createPlan(name), throwsArgumentError);
+        await expectLater(
+          store.renamePlan(first.id, name),
+          throwsArgumentError,
+        );
+      }
+      await expectLater(store.activatePlan('missing'), throwsStateError);
+      await expectLater(store.renamePlan('missing', 'valid'), throwsStateError);
+      await expectLater(store.deletePlan('missing'), throwsStateError);
+      expect((await store.plans()).single.name, '保留');
+      expect((await store.plans()).single.active, isTrue);
+      // A failed insert must roll back the entire active-plan switch.
+      final second = (await store.createPlan('另一个')).last;
+      final db = await databaseFactoryFfi.openDatabase(path);
+      await db.execute(
+        "CREATE TRIGGER fail_activation BEFORE UPDATE OF active ON training_plans WHEN NEW.active = 1 BEGIN SELECT RAISE(ABORT, 'test failure'); END",
+      );
+      await expectLater(
+        store.activatePlan(second.id),
+        throwsA(isA<DatabaseException>()),
+      );
+      expect((await store.plans()).where((p) => p.active).single.id, first.id);
+    },
+  );
 }

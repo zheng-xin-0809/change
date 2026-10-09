@@ -82,6 +82,15 @@ class TrainingPlan {
   final bool active;
 }
 
+/// Names are user text; cap by Unicode code points, not UTF-16 code units.
+String validatedPlanName(String input) {
+  final name = input.trim();
+  if (name.isEmpty || name.runes.length > 60) {
+    throw ArgumentError('Plan names must contain 1 to 60 characters');
+  }
+  return name;
+}
+
 class DaySchedule {
   const DaySchedule({
     required this.kind,
